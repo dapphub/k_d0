@@ -1,0 +1,91 @@
+#!/usr/bin/env node
+const fs = require("fs");
+const abifile_name = process.argv[2];
+
+const g_cond = {
+  "suck": `  andBool minSInt256 <=Int (V -Int V1)
+  andBool (V -Int V1) <=Int maxSInt256`
+}
+
+const global_tmp = ({store}) => ({name, callData, cond}) =>
+`[${name}]
+k: #execute => #halt
+statusCode: _ => EVMC_SUCCESS
+output: _ => _
+callData: ${callData}
+localMem: _
+pc: 0 => _
+wordStack: .WordStack => _
+gas: G => _
+log: _
+callDepth: _
+refund: _
+storage:
+  ${
+Object.keys(store)
+  .map(key => key + " |-> " + (typed[store[key]] == "int256" ? "#unsigned(" : "") + store[key] + (typed[store[key]] == "int256" ? ")" : ""))
+  .join("\n  ")
+}
+  _:Map
+activeaccounts:
+accounts:
+requires:
+  andBool G >Int 100000
+  ${cond}
+  ${
+Object.keys(store)
+.map(key => store[key])
+.map(s => `andBool ${bound[typed[s]][0]} <=Int ${s} andBool ${s} <Int ${bound[typed[s]][1]}`)
+.join("\n  ")
+  }
+${g_cond[name] || ""}
+attribute:
+`
+
+const store = {
+  "0"  : "Root",
+  "9"  : "V_p",
+  "10" : "P",
+  "11" : "V",
+  "12" : "G",
+}
+const typed = {
+  "Root": "address",
+  "G"   : "uint256",
+  "P"   : "int256",
+  "V_p" : "int256",
+  "V"   : "int256",
+}
+const bound = {
+  "uint256": ["0", "pow256"],
+  "bytes32": ["0", "pow256"],
+  "address": ["0", "pow160"],
+  "int256": ["minSInt256", "maxSInt256"],
+}
+
+const tmp = global_tmp({store});
+
+const abi = JSON.parse(fs.readFileSync(abifile_name));
+let abit = abi
+  .filter(({type}) => type == "function")
+  .map(({name, inputs}) => {
+    let callData = `#abiCallData("${name}", ${
+      inputs.length == 0
+      ? ".TypedArgs"
+          : inputs
+            .map(({type}, i) => "#" + type + "(V" + i + ")")
+            .join(", ")
+      })`
+    let cond = inputs
+      .map(({type}, i) => `andBool ${bound[type][0]} <=Int V${i} andBool V${i} <Int ${bound[type][1]}`)
+      .join("\n  ")
+    return {
+      name,
+      callData,
+      cond
+    }
+  })
+  .map(tmp)
+
+
+console.log(abit[0]);
