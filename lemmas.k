@@ -1,4 +1,12 @@
-rule #take(N, #padToWidth(N, X) ++ Z ) => X
+rule #take(N, #padToWidth(N, WS) ++ WS' ) => #padToWidth(N, WS)
+
+// shifting trick in the beginning of ABI thing:
+// dividing by 16^56 == 2^224 is the same as shifting to last 4 bytes
+rule #asWord(W : X : Y : Z : WS) /Int 26959946667150639794667015087019630673637144422540572481103610249216 => #asWord(W : X : Y : Z : .WordStack)
+
+rule #asWord(#padToWidth(32, #asByteStack(#unsigned(X)))) => #unsigned(X)
+  requires #rangeSInt(256, X)
+
 rule #asWord( #asByteStack( X ) ) => X
 
 rule #hashedLocation("DappHub", BASE, OFFSET OFFSETS) => #hashedLocation("DappHub", keccakIntList(BASE OFFSET),       OFFSETS)
